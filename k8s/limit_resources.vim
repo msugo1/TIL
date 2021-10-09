@@ -962,3 +962,223 @@ postStart & container's EntryPoint = 비동기적으로 실행
 
 * postStart의 명령어 혹은 HTTP 요청이 제대로 실행되지 않으면 컨테이너는 Running 상태로 전환되지 않는다.
   = init container와 마찬가지로 restartPolicy에 의해 해당 컨테이너가 재시작된다.
+
+### livenessProbe, readinessProbe
+: 애플리케이션이 사용자의 요청을 처리할 수 있는 상태인지 판별하는 방법
+
+- Pod becomes Running after init Containers & post hooks are done 
+
+1. livenessProbe
+- 컨테이너 내부의 애플리케이션이 살아있는지 검사
+- 검사에 실패할 경우, 해당 컨테이너는 restartPolicy에 따라 재시작
+```
+apiVersion: v1
+kind: Pod
+metadata:
+  name: livenessprobe-pod
+spec:
+  containers:
+  - name: livenessprobe-pod
+    image: nginx
+    linvenessProbe:
+      httpGet:
+        port: 80
+        path: /
+
+kubectl apply -f <name>.yaml
+kubectl exec <pod name> -- rm /usr/share/nginx/html/index.html
+kubectl get pods -w
+
+kubectl describe po livenessprobe-pod
+(index.html을 삭제하면 다른 status code가 날아와 liveness 검사에 실패한다.
+  -> 컨테이너가 restart 된다.
+  -> 새로 생성된 컨테이너에는 index.html이 들어있으므로 검사에 성공한다.
+  -> 더이상 restart 카운트가 상승하지 않는다.)
+
+kubectl get events --sort-by=.metadata.creationTimestamp
+(해당 명령어로도 이벤트를 확인할 수 있다.)
+```
+
+* livenessProbe, readinessProbe 모두 다음 3가지의 방식 중 하나를 선택해 애플리케이션의 상태를 검사할 수 있다.
+  1) httpGet
+  = HTTP 요청을 전송해 상태를 검사한다.
+  = 응답코드가 2xx or 3xx가 아닌 경우 상태검사가 실패한 것으로 간주된다.
+  = 요청을 보낼 포트와 경로, 헤더, HTTPS 사용 여부 등을 추가로 지정할 수 있다.
+  2) exec
+  = 컨테이너 내부에서 명령어를 실행해 상태를 검사한다.
+  = 명령어의 종료코드가 0이 아닌 경우 애플리케이션의 상태검사가 실패한 것으로 간주한다.
+  3) tcpSocket
+  = TCP 연결이 수립될 수 있는지 체크함으로써 상태를 검사한다.
+  = TCP 연결이 생성될 수 없는 경우에 애플리케이션의 상태 검사가 실패한 것으로 간주된다.
+
+2. readinessProbe
+- 컨테이너 내부의 애플리케이션이 사용자 요청을 처리할 준비가 되었는지 검사
+- 실패할 경우 컨테이너는 서비스의 라우팅 대상에서 제외
+
+* 1 is more like 애플리케이션이 정상 상태를 유지하고 있는지 지속해서 검사,
+    whereas 2 is to do with 애플리케이션이 시작된 뒤 초기화 작업이 마무리되어 준비가 되었는지 검사 (liteally `readiness`)
+  = readinessProbe fail
+    -> 애플리케이션이 아직 준비가 되지 않았단 뜻(재시작이 필요가 없다.)
+    -> 차후에 초기화 작업 완료되면 readinessProbe 검사가 성공할 것
+    (그때가면 사용자의 요청이 포드로 전달될 수 있도록 서비스의 라우팅 대상에 해당 포드의 IP가 추가된다.)
+  = livenessProbe fail
+    -> 애플리케이션 내부에 문제가 생겼다는 뜻 -> 정상 상태로 되돌리기 위해 재시작이 필요하다.
+
+```
+apiVersion: v1
+kind: Pod
+metadata:
+  name: readinessprobe-pod
+  labels:
+    my-readinessprobe: test
+spec:
+  containers:
+  - name: readinessprobe-pod
+    image: nginx
+    readinessProbe:
+      httpGet:
+        port: 80
+        path: /
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: readinessprobe-svc
+spec:
+  ports:
+    - name: nginx
+      port: 80
+      targetPort: 80
+  selector:
+    my-readinessprobe: test
+  type: ClusterIP
+
+kubectl apply -f readinessprobe-pod-svc.yaml
+kubectl get pods -w
+kubectl run -i --tty --rm debug --image=alicek106/ubuntu:curl \
+  --restart=Never -- curl readinessprobe-svc
+kubectl get endpoints
+
+kubectl exec readinessprobe-pod -- rm /user/share/nginx/html/index.html
+kubectl get pods -w
+(ready가 하나 줄어든다. = restart 횟수는 증가하지 않는다.
+  = 서비스 리소스는 사용자 요청을 해당 포드로 전달하지 않는다.)
+
+kubectl run -i --tty --rm debug --image=alicek106/ubuntu:curl \
+  --restart=Never -- curl --connect-timeout 5 readinessprobe-svc 
+ㅇ
+kubectl get endpoints
+(엔드포인트 리소스 목록을 확인해보면 라우팅 대상에서 포드의 IP가 제거되어 있다.)
+
+* 애플리케이션에 readinessProbe를 적용하기 어렵거나, 초기화 시간이 어느 정도 필요한 경우?
+  = deployment에서 `minReadySeconds`를 사용할 수 있다.
+  = 디플로이먼트의 업데이트 시 컨테이너가 준비되기 위한 최소 대기 시간  
+  = 새로운 포드가 생성된 뒤 `minReadySeconds`의 시간이 지나야 포드의 삭제 및 생성이 계속된다.
+
+ex.
+```
+spec:
+  replicas: 1
+  minReadySeconds: 30
+  strategy:
+    type: RollingUpdate
+```
+
+### 세부 욥션 for readinesProbe, livenessProbe
+- 필요한 경우 `상태 검사 주기` or `타임아웃 시간` 등의 세부 옵션을 명시적으로 설정할 수 있다.
+(세부 옵션을 설정하지 않은 경우, 기본값이 적용된다.)
+
+```
+- periodSeconds: 상태 검사를 진행할 주기 (default: 10)
+- initialDelaySeconds: 포드가 생성된 뒤 상태 검사를 시작할 때까지의 대기 시간 (default: x)
+- timeoutSeconds: 요청에 대한 타임아웃 시간을 설정 (default: 1)
+- successThreshod: 상태검사에 성공했다고 간주할 검사 성공횟수 (default: 1)
+- failureThreshold: 상태검사가 실패했다고 간주할 검사 실패 횟수 (default: 3)
+
+  readinessProbe:
+    httpGet:
+      port: 80
+      path: /
+    periodSeconds: 5
+    initialDelaySecond: 10
+    timeoutSeconds: 1
+    successThreshold: 1
+    failureThreshold: 3
+
+### Terminating 상태와 애플리케이션의 종료
+- 새로운 애플리케이션 배포 시 새로운 포드가 준비되었는지 확인하는 것 만큼 중요한 작업?
+  = 기존 버전의 포드를 무사히 종료시키는 것
+  = graceful shutdown
+- 가장 좋은 방법
+  = 애플리케이션의 소스코드 레벨에서 종료 처리 로직을 구현하는 것
+  = 이러한 로직이 언제 실행되는지 파악하려면 포드가 삭제될 때 어떠한 일들이 발생하는지 알 필요가 있다.
+
+* 포드 삭제 시 (ex. kubectl delete)
+1. deletionTimestamp 값이 포드의 데이터에 추가되고, 포드 상태가 Terminating으로 바뀐다.
+  (deletionTimestamp: 리소스가 삭제될 예정이라는 의미)
+2. 
+  1) 포드에 preStop 라이프사이클 훅이 있는 경우 해당 훅 실행
+  2) 포드가 레플리카셋으로부터 생성된 경우 해당 포드는 레플리카셋의 관리 영역에서 벗어난다.
+  (레플리카셋은 새로운 포드를 생성하려고 시도한다.)
+  3) 포드가 서비스 리소스의 라우팅 대상에서 제외된다.
+3. preStop 훅이 완료되면 `SIGTERM`이 포드의 컨테이너에 전달된다.
+  = 컨테이너의 init 프로세스는 SIGTERM을 수신한 뒤 종료되어야 한다.
+4. 특정 유예기간이 지나도 컨테이너 내부의 프로세스가 여전히 종료되지 않으면?
+  = SIGKILL이 전달된다.
+  = 유예기간의 기본 값은 30초, but `terminationGracePeriodSeconds 항목을 통해 설정할 수 있다.
+
+- 2-1 or 3번 단계에서 graceful shutdown 장치를 만들 수 있다...
+   
+```
+apiVersion: v1
+kind: Pod
+metadata:
+  name: readinessprobe-pod
+  labels:
+    my-readinessprobe: test
+spec:
+  containers:
+  - name: readinessprobe-pod
+    image: nginx
+    liifecycle:
+      preStop:
+        exec:
+          command: ["/usr/sbin/nginx","-s","quit"]
+
+- preHook을 실행한 이후 포드의 컨테이너들이 SIGTERM 시그널을 보냄으로써 포드가 곧 종료될 것을 알림
+  = SIGTERM을 처리하는 별도의 로직을 구현해야 한다.
+
+### HPA
+  = Horizontal Pod Autoscaler
+  = 리소스 사용량에 따라 디플로이먼트 포드 개수를 자동으로 조절
+  = 내장기능이긴 하지만, `metrics-server`, 별도의 리소스 메트릭 수집도구를 설치해야만 해당 기능을 사용할 수 있다.
+(오토 스케일링을 활용하기 위해 어디선가 CPU or 메모리 사용량 정보를 제공받아야 한다.
+  -> 쿠버네티스는 자체적인 메트릭 수집 기능이 없다.
+)
+
+```
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: simple-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: hostname-deployment
+  targetCPUUtilizationPercentage: 50
+  maxReplicas: 5
+  minReplicas: 1
+```
+
+- CPU Utilization
+  = HPA는 포드의 절대적인 리소스 사용량이 아닌, 포드에 할당된 request 대비 얼마나 리소스를 사용하고 있는지를 기준으로 한다.
+  ex. Pod에 1000m CPU 할당한 경우, 500m을 기준으로 오토 스케일링 진행
+  = 전체 리소스 사용률의 평균이 타깃 값보다 아래가 될 때까지 오토 스케일링
+
+* HPA가 모든 상황에서 무조건 좋은 것은 아니다.
+  ex. JVM based applications
+  = 어플리케이션이 초기화되는 동안 CPU를 과도하게 소모한다.
+  = CPU 사용률을 기준으로 오토 스케일링 하기 때문에, 계속 불필요하게 포드를 스케일 아웃 한다.
+  = 포드의 증식
+(완벽한 해결책은 없으나, 포드 개수를 싱크하는 주기 `--horizontal-pod-autoscaler-sync-period` 등을 수정해 어느 정도 완화할 수 있다.)
