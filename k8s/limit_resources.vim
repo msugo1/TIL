@@ -189,7 +189,7 @@ kubectl describe pod resource-limit-pod | grep QoS
 3. Burstable
 - Limits > Requests (= Overcommit)
 - 1, 2에 속하지 않으면 무조건 3
-- Requests < 자원 사용량 < Limits 범위의 경우,ㄷ 다른 포드와 자원 경합이 발생할 수도 있다.
+- Requests < 자원 사용량 < Limits 범위의 경우, 다른 포드와 자원 경합이 발생할 수도 있다.
   = Requests 보다 더 많은 자원을 사용하고 있는 포드나 프로세스의 우선순위가 더 낮게 설정된다.
 
 ### OOM & Post Process
@@ -485,6 +485,7 @@ spec:
 (적어도 노드의 이름에 종속적이지 않게 YAML 파일을 작성할 수 있다.)
 = 각 포드에 단일 수행된다. 
 (레플레카 셋에 묶여있어도 각 포드마다 따로 적용된다. = 같은 레플리카엣에 있는 포드가 다른 노드에 할당될 수 있다.)
+
 2. Node Affinity
 - 단순히 라벨의 카-값이 같은지만 비교해 노드를 선택하는 방법은 활용이 제한적
 - 이를 보완하기 위해 쿠버네티스는 Node Affinity 스케줄링 방법을 제공
@@ -831,6 +832,8 @@ spec:
   = 두 버전의 애플리케이션이 공존하지 않는다.
   = replicas * 2 개수만큼의 포드가 일시적으로 생성되므로, 순간적으로 전체 자원을 많이 사용할 수 있다.
 - 쿠버네티스가 자체적으로 지원하지는 않는다.
+  = 직접 구현하면 생각보다 쉽게 할 수 있다.
+  ex. 새로 deployment/replicaSet 생성 & 라벨 switch
 
 ### 포드의 생애 주기
 - 디플로이먼트를 이용해 새로운 버전의 애플리케이션으로 롤링 업데이트를 진행할 때는, 기존 포드가 정상적으로 종료됐는지, 새로운 포드가 사용자의 요청을 처리할 수 있도록 준비되었는지 확인하는 것이 좋다.
@@ -856,10 +859,11 @@ spec:
   - 포드가 삭제 or eviction 되기 위해 삭제 상태에 머물러 있는 경우
 
 * restartPolicy = always?
-  - 포드의 컨테이너가 종료되었을 때 자동으로 다시 재시작된다.
+  - 포드의 `컨테이너가 종료`되었을 때 자동으로 다시 재시작된다.
 kubectl get pod <pod name> -o yaml | grep restartPolicy
   - always 외에도 Never or OnFailure도 지정 가능
     = 이름대로 Never은 재시작 x, OnFailure은 종료 코드가 0이 아닌 경우만 재시작
+
 ex.
 ```
 apiVersion: v1
@@ -956,6 +960,7 @@ spec:
         exec:
           command: ["sh", "-c", "touch /myfile"]
 ```
+
 주의)
 postStart & container's EntryPoint = 비동기적으로 실행
 (어떤 것이 먼저 실행될지 보장이 없다.)
@@ -1066,7 +1071,7 @@ kubectl get pods -w
 
 kubectl run -i --tty --rm debug --image=alicek106/ubuntu:curl \
   --restart=Never -- curl --connect-timeout 5 readinessprobe-svc 
-ㅇ
+
 kubectl get endpoints
 (엔드포인트 리소스 목록을 확인해보면 라우팅 대상에서 포드의 IP가 제거되어 있다.)
 
@@ -1114,17 +1119,22 @@ spec:
   = 이러한 로직이 언제 실행되는지 파악하려면 포드가 삭제될 때 어떠한 일들이 발생하는지 알 필요가 있다.
 
 * 포드 삭제 시 (ex. kubectl delete)
-1. deletionTimestamp 값이 포드의 데이터에 추가되고, 포드 상태가 Terminating으로 바뀐다.
+1. `deletionTimestamp` 값이 포드의 데이터에 추가되고, 포드 상태가 Terminating으로 바뀐다.
   (deletionTimestamp: 리소스가 삭제될 예정이라는 의미)
+
 2. 
-  1) 포드에 preStop 라이프사이클 훅이 있는 경우 해당 훅 실행
+  1) 포드에 `preStop` 라이프사이클 훅이 있는 경우 해당 훅 실행
   2) 포드가 레플리카셋으로부터 생성된 경우 해당 포드는 레플리카셋의 관리 영역에서 벗어난다.
   (레플리카셋은 새로운 포드를 생성하려고 시도한다.)
   3) 포드가 서비스 리소스의 라우팅 대상에서 제외된다.
+  = 위 세가지 동작이 한 번에 이루어진다.
+  (순서대로 X)
+
 3. preStop 훅이 완료되면 `SIGTERM`이 포드의 컨테이너에 전달된다.
   = 컨테이너의 init 프로세스는 SIGTERM을 수신한 뒤 종료되어야 한다.
-4. 특정 유예기간이 지나도 컨테이너 내부의 프로세스가 여전히 종료되지 않으면?
-  = SIGKILL이 전달된다.
+
+4. 특정 `유예기간`이 지나도 컨테이너 내부의 프로세스가 여전히 종료되지 않으면?
+  = `SIGKILL`이 전달된다.
   = 유예기간의 기본 값은 30초, but `terminationGracePeriodSeconds 항목을 통해 설정할 수 있다.
 
 - 2-1 or 3번 단계에서 graceful shutdown 장치를 만들 수 있다...
