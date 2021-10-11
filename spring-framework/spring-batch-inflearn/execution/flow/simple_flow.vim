@@ -187,3 +187,177 @@ class JobConfiguration(
      |  |    Step6   |  |
      |   ------------   |
       ------------------
+
+* 어떤 타입이 인자로 주어지냐에 따라서 다른 state를 저장한다.
+
+from FlowBuilder, with start, next, from
+
+1. step - stepState
+2. flow - flowState
+3. decider - decisionState
+
+then with executor - splitState
+              |
+              |
+   now `StateTransition`
+      1. state 
+        = 현재 state
+      2. pattern
+      3. next
+        = 다음 state
+              |
+              |
+         in SimpleFlow
+ 1. Map<String, State> stateMap
+ 2. State startState
+ 3. Map<String, Set<StateTransition>> transitionMap
+ **4. List<StateTransition> stateTransitions**
+    = 위에서 생성한 StateTransition이 여기 저장된다.
+
+* transition은 구체적인 것부터 그렇지 않은 순서로 적용된다.
+* simpleFlow를 구성하고 있는 모든 step 들이 transition에 따라 분기되어 실행
+* simpleFlow 내 simpleFlow를 2중, 3중으로 중첩해서 복잡하게 구성가능
+
+              
+          CurrentState ------- StateTransition ------- NextState
+                                    /|\
+                                     |
+                                     |        
+        SimpleFlow ---- 실행---->  State
+                  
+                            1. String getName()
+              2. FlowExecutionStatus handle(FlowExecutor executor)
+                          3. boolean isEndState()
+      
+              * Step, Flow, JobExecutionDecider 의 각 요소들을 저장
+              * Flow를 구성하면 내부적으로 생성되어 Transition과 연동
+              * handle() 메소드 실행 후 FlowExecutionStatus 반환
+                = on(pattern)의 pattern 값과 매칭여부 판단
+                = 마지막 실행상태가 FlowJob의 최종상태
+
+                                    /|\
+                                     |
+                                     |
+                               AbstractState
+                                     |
+                                     |
+          --------------------------------------------------------------
+         |               |               |              |               |
+     StepState       FlowState     DecisionState     EndState      SplitState
+
+       step            flow           decider                         flows
+
+
+
+
+
+  
+                                     executor.executeStep()  stepHandler.handleStep(step)
+                               --> StepState --> JobFlowExecutor --> StepHandler --> Step
+                              / 
+                             / 
+   FlowJob ----> SimpleFlow -  state.handle(executor)
+    flow.start(executor)     \
+                              \       flow.start(executor)      
+       return FlowExecution    --> FlowState --> SimpleFlow --> FlowState --> SimpleFlow 
+                              |                            |
+                              |                             --> StepState
+                              |                            |
+                              |                             --> DecisionState
+                              |                            |
+                              |                             --> SplitState
+                              |
+                               --> DecisionState ----> JobExecutionDecider
+                              |      decider.decide(jobExecution, stepExecution)
+                              |
+                              |
+                               --> SplitState ---> SimpleFlow ---> FlowState
+                                             |
+                                              ---> SimpleFlow ---> StepState
+                                  (multi-threaded)
+
+
+= SimpleFlow 
+  - StepMap에 저장되어 있는 모든 State 들의 handle 메서드 호출
+    (모든 스텝들이 실행될 수 있도록)
+  - 현재 호출되는 State가 어떤 타입인지 모르고 관심도 없음
+    (단지 handle 메소드 실행 후 상태 값만 얻어온다.)
+ 
+### execution
+                                          처음 실행 될 StartState 지정 후 실행
+                                             ----> start()
+                           start()          |
+  FlowJob ---> FlowExecution ---> SimpleFlow ------------> (loop) resume()
+                                      |     |    - 현재 state 실행 후 다음 state 실행
+                                      |     |    - 실행 순서는 설정/조건에 따라 결정
+                                      |     |         (순차적 x)
+                                      |     |    - state == null or 실행불가능하면 종료
+                                      |     |
+                                      |      ------------> nextState()
+                                   *stateMap*       stateMap에서 다음 실행할 state 선택
+                                   StepState
+                                   FlowState
+                                   DecisionState
+
+* from `start`
+
+          start() <-----
+                        |    ---> StepState ---> Step
+                        |   |
+                    resume() ---> FlowState ---> Flow
+                        |   |
+                        |    ---> StepState ---> Step
+        nextState() <---
+            |
+ <----------
+* lookup StateMap
+
+### in code
+1. on
+  -> steps iteration (steps registered)
+  -> builder.next or builder = new JobFlowBuilder(new FlowJobBuilder(this), step)
+
+2. start
+  -> doStart
+
+3. createState
+  -> this.currentState = createState(input)
+    = StepState 객체 생성 & 맵에 저장
+
+4. on, to
+  (Transition)
+  next = parent.createState(step)
+  parent.addTransition(pattern, next)
+  parent.currnetState = next
+  retrun parent
+
+  * addTransition
+    = transitions.add(StateTransition.createStateTransition(currentState, pattern, next.getName()))
+    = if (transitions.size() == 1) 인 경우 추가처리
+    = if (next.isEndState()) 인 경우 추가처
+
+** 위의 과정 반복 **
+
+5. finally, flow = SimpleFlow(name)
+  with end()
+
+then execute 
+FlowJob 
+  -> flow.start(executor)
+    = start `startState`, which is the first step or flow registered
+  -> resume(stateName, executor)
+    = 맨 첫 state를 얻어와서 resume 호출
+    = 계속해서 현재 상태, 다음 상태가 무엇인지 알아내서 실행
+
+SimpleFlow
+  -> state.handle(executor)
+     
+  -> nextState?
+     exitCode = status.getName
+     = 종료코드 매칭 확인
+     = stateTransition.isEnd 여부 확인
+      (종료일 경우 return null, 아닐 경우 반복 by next = stateTrainsition.getNext()
+
+StepState
+  -> return FlowExecutionStatus(executor.executeStep(step))
+
