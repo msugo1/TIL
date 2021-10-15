@@ -91,3 +91,60 @@ examples
 4. :%s/\<variable\>/var/g
   = 문서 전체에서 variable을 찾아 var로 변경
 
+### 멀티 윈도우
+가로 분할, 세로 분할이 존재
+
+1. 가로 분할
+  - `:split`, `ctrl+w s`, `ctrl+w n
+  
+  or when open
+
+  - vim `-o` file1 file2 ..
+  
+  # 새 창
+  - `:new` or `ctrl+w n`
+
+2. 세로 분할
+  - `:vsplit`, `ctrl+w v`
+  
+  or when open
+
+  - vim `-o` file1 file2 ..
+
+ # 새 창
+  - `:vnew` or `ctrl+w N`
+
+3. 창 닫기
+  1) 현재 창
+  - `:quit`, or `ctrl + w q`
+  
+  2) 현재 창만 남기기
+  - `:only` or `ctrl + w o`
+
+4. 창간 이동
+  - ctrl + w w: 다음 창으로 이동
+  - ctrl + w k: 윗 창으로 이동
+  - ctrl + w j: 아래 창으로 이동
+  - ctrl + w h: 왼쪽 창으로 이동
+  - ctrl + w l: 오른쪽 창으로 이동
+  - ctrl + w t: 최상단 창으로 이동
+  - ctrl + w b: 최하단으로 이동
+
+5. 창 이동
+  - ctrl + w K: 윗 창으로 이동
+  - ctrl + w J: 아래 창으로 이동
+  - ctrl + w H: 왼쪽 창으로 이동
+  - ctrl + w L: 오른쪽 창으로 이동
+
+8. 창 크기 조절
+  - ctrl + w // ctrl + w -: 높이 증가/감소
+  - ctrl + w _ or /: 높이 최대화
+  - ctrl + w > // ctrl + w <: 폭 증가/감소
+  - ctrl + w |: 폭 최대화
+  - ctrl + w: 높이/폭 모두 같게
+
+9. 기타 기능
+  - 새 창에서 tag jump
+  : ctrl + w ]
+  - 커서 위치의 파일 이름을 새창에서 열기
+  : ctrl + w f
