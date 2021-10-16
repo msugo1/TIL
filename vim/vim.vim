@@ -136,15 +136,73 @@ examples
   - ctrl + w H: 왼쪽 창으로 이동
   - ctrl + w L: 오른쪽 창으로 이동
 
-8. 창 크기 조절
+6. 창 크기 조절
   - ctrl + w // ctrl + w -: 높이 증가/감소
   - ctrl + w _ or /: 높이 최대화
   - ctrl + w > // ctrl + w <: 폭 증가/감소
   - ctrl + w |: 폭 최대화
   - ctrl + w: 높이/폭 모두 같게
 
-9. 기타 기능
+7. 기타 기능
   - 새 창에서 tag jump
   : ctrl + w ]
   - 커서 위치의 파일 이름을 새창에서 열기
   : ctrl + w f
+
+### 단축키 지정
+- 어떤 모드에서 어떤 키에 어떤 액션을 지정하겠다.
+
+map - normal, visual, select, oppend
+nmap  - normal
+vmap - visual, select
+smap - select
+xmap - visual
+omap - oppend
+map! - insert cmdline
+imap - insert
+lmap - insert, cmdline, lang-arg
+cmap - cmdline
+tmap - terminal
+
+1. 기본 문법
+:CMD LHS RHS
+- CMD: map, nmap, imap
+- LHS: 입력할 키
+- RHS: 입력 시 동작
+
+* 키 표현
+- <C-key>: CTRL + key
+- <S-key>: SHIFT + key
+- <A-key>: ALT + key
+- <C-S-key>: CTRL + SHIFT + key
+
+* 특수 키 표현
+- <BS>
+- <Tab>
+- <CR>, <Enter>, <Return>
+- <ESC>
+- <Space>
+- <Up> / <Down> / <Left> / <Right>
+- <F1> - <F12>
+- <Insert>
+- <Del>
+- <Home>
+- <End>
+- <PageUP>
+- <PageDown>
+
+ex.
+* normal mode, F8 = printf()
+  = `:nmap <F8> oprintf("%s %d line: \n", __func__, __LINE__); <ESC>
+
+* insert mode, F8 = print()
+  = `:imap <F8> printf("%s %d line: \n", __func___, __line__); <CR> (Enter)
+
+* F2 누르면 커서 위의 단어를 cscope find symbo로 매핑해서 실행
+  = `:nmap <F2> :cs find s <C-R>=expand("<cword>")<CR><CR>
+
+  cs - cscope
+  find s - cscope command
+  <C-R=expand("<cword>") - 커서 위의 단어 가져오기
+
+  = `:nmap <F7> :man <C-R>=expand("<cword>")<CR>

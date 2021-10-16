@@ -184,15 +184,7 @@ cat /etc/cni/net.d/10-bridge.conf
 - one node, through a router, to another node
   = works well in a small network but what if it grows huge?!
   = routing table may not support such humongous entries  
-### shiping analogy
-1. place an agent on each node (sight)
-  - agent: managing all transferringa activities among sights.
 
-
-* send packet one port to the other
-- one node, through a router, to another node
-  = works well in a small network but what if it grows huge?!
-  = routing table may not support such humongous entries  
 ### shiping analogy
 1. place an agent on each node (sight)
   - agent
@@ -270,7 +262,7 @@ ex. weave
 
   - the peers decide to split the ip address equally among them and assign one portion to each node
     = pods created on these nodes will have ips in the range above
-    = this range is configurable with additional options  while deploying the weave plugin to a cluster. 
+    = this range is configurable with additional options while deploying the weave plugin to a cluster. 
 
 ### Solution (Networking Weave)
 kubectl get nodes
@@ -285,3 +277,95 @@ kubectl run busybox --image=busybox --command sleep 1000 --dry-run=client -o yam
 
 kubectl exec -it busybox -- bash/sh
 ip r
+
+### Service Networking
+
+  * Types of Services
+  
+  1. Cluster IP
+  - when a service is created, it is accessible from all the pods in the cluster 
+  (irrespective of what nodes pods are on)
+  
+  - a pod is hosted on a node
+  , whereas a service is hosted on the cluster
+
+  - though, a service is only accessible from the same cluster
+
+  2. NodePort
+  - an ip address gets assigned to it
+  then, works just like a cluster IP
+ 
+  - expose its port on all nodes in the cluster (for access from outside)
+
+
+* How are the services getting the IP addresses, how are they made available across all the nodes in the cluster, how is the service made available to external users through a port on each node
+
+* every k8s node runs a kubelet process, responsible for creating pods.
+- each kubelet service on each node watches any change in the cluster through the kube-api server 
+- and every time a pod is to be created, it creates a pod on the nodes.
+- it then invokes the CNI plugin to configure networking for that pod
+
+* similary each node runs another component known as kube-proxy
+- kube proxy watches the change in the cluster through the kube-api server. and every time a new service is to be created, kube-proxy gets into action
+
+- unlike pods, services are not created on each node or assigned to each node
+  = services are a cluster-wide concept
+  (they exist across all the nodes in the cluster)
+  = as the matter of fact, they don't exist at all?!
+  (there is no service nor service really listening on the ip of the service)
+   
+cf)
+pods have containers, which have namespaces with interfaces and ips assigned to those interfaces
+
+- with services nothing like that exists (no processes, nor namespaces, interfaces for a service)
+  = it is just a virtual object
+
+Then, how do they get an ip address and how are we able to access the application on the pod through services  
+  - when we create a service object on k8s, it is assigned an ip address within the pre-defined range
+  - kube-proxy components running on each node gets that ip address, and creates forwarding rules on each node in the cluster 
+  ex. any traffic coming to this ip, should go to the ip of the pod.
+    once that is in place, whenever a pod tries to reach the ip of the service, it is forward to the pod's ip address, which is accessible from any node in the cluster
+  (it is not just an ip, but ip & port combination)
+
+whenever services are created or deleted, kube proxy creates or deletes these rules
+
+* How are the rules configured then?
+  - kube proxy supports different ways
+
+1. userspace 
+- where kube proxy listens on a port for each service
+
+2. ipvs 
+- proxies(?) connections to the pods by creating ipvs rules   
+
+3. (default) iptables
+
+* proxy mode can be set using the proxy mode option while configuring kube proxy service
+  = `kube-proxy --proxy-mode [userspace | iptablkes | ipvs] ...
+111
+* How ip tables are configured by kube-proxy, and how you can view them on the nodes
+
+```
+kubectl get pods -o wide
+kubectl get service
+kube-api-server --service-cluster-ip-range ipNet (default: 10.0.0.0/24)
+
+ps -aux | grep kube-api-server
+```
+whatever range is specified for each of these networks, it shouldn't overlapped
+
+```
+iptables -L -t nat | grep db-service
+  = any traffic going to the address, x on port y, (ip of the service) should have its destination address changed to a:b
+
+cat /var/log/kube-proxy.log
+
+### Solutions
+kubectl get nodes -o wide
+ip a
+kubectl -n kube-system get pods
+kubecl -n kube-system log <pod> -c weave
+cd /etc/kubernetes/manifests; vim kube-apiserver.yaml
+kubectl get pods -n kube-system
+kubectl logs -n kube-system <pod>
+kubectl get ds -n kube-system
