@@ -206,3 +206,49 @@ ex.
   <C-R=expand("<cword>") - 커서 위의 단어 가져오기
 
   = `:nmap <F7> :man <C-R>=expand("<cword>")<CR>
+
+
+
+### 기타 기능
+
+  1. 자동완성
+    - (insert mode) CTRL + p
+  2. diff
+    - `vim -d` (file 1) (file 2) ..
+    - `diffthis`
+    - `diffoff`
+    - `vimdiff (file 1) (file 2) ..`
+  3. fold
+    - 생성: (VISUALBLOCK)zf
+    - 삭제: zd
+    - 열기: zo
+    - 닫기: zc
+  4. 괄호 쌍 이동
+    - (괄호에 커서 놓고)%
+  5. 마킹
+    - 위치 마킹: m[a-z]
+    - 마킹으로 이동: '[a-z]
+
+  6. man 페이지 열기
+    - (단어 위에 커서 놓고) K (upper k)
+    - section n에 대한 man page 열기: `nK`
+  7. identation
+    - indentation movement: `<<, >>`
+    - 현재 줄 auto indent :==
+    - 블록에 적용 :(VISUALBLOCK)=
+    - 파일 전체 적용: gg=G
+
+:set expandtab
+
+
+### Plugin for VIM
+in `~/.vim/plugin` 디렉터리에 plugin 파일 복사
+
+- 플러그인 관리자
+  = vundle, pathogen, vim-plug ...
+
+* where to find
+- vimawesome.com
+
+
+
