@@ -186,4 +186,39 @@ in session
   - 인서트 버퍼에 저장된 인덱스 레코드 조각은 이후 BT에 의해 병합(= Insert Buffer Merge Thread)
     = DELETE 버퍼링 도 가능 since 5.5
 
+# Redo log & Log Buffer
+  - RDBMS의 목표는 ACID 보장
+  - but, 데이터 변경 작업은 랜덤한 디스크 기록을 invoke
+    = 부하를 줄이기 위해 버퍼 풀 사용
+  - 버퍼 풀만으로는 ACID 보장불가
+  - 추가로, 변경된 내용을 순차적으로 디스크에 기록하는 로그파일을 둔다. (redo log)
+    = ACID 보장 + 성능 향상에 도움 (ex. 버퍼링 된 데이터 한꺼번에 디스크에 flush)
+    = 사용량이 많다면 redo log 기록 작업 자체가 문제가 될 수 있다.
+    (따라서, 최대한 ACID를 보장하는 수준에서 버퍼링)
+  
+  * log buffer?
+  - redo log buffering 시 사용한다.
 
+# MVCC
+  - for the sake of 일관된 읽기 without locks
+  - 하나의 레코드에 대해 여러 개의 버전이 동시에 관리된다.
+    = 데이터 업데이트 시, commit/rollback 전, 다른 커넥션에서 해당 row를 조회할 경우 보여질 값을 결정하는 것?
+      -> 격리 수준! (Isolation Level)
+
+  * 격리수준
+  - READ_UNCOMMITED, READ_COMMITED, REPEATABLE_READ, SERIALIZABLE
+
+  READ_UNCOMMITED
+  - 커밋/롤백이 되든 안됬든, 변경된 상태의 데이터 반환
+
+  그 외
+  - undo 영역의 데이터를 반환
+
+  - 트랜잭션이 길어지면 언두에서 관리하는 예전 데이터가 삭제되지 못하고 오랫동안 관리되어야 한다.
+    = 언두 영역이 저장되는 시스템 테이블 스페이스의 공간이 많이 늘어날 수 있다.
+  - commit 시, 변경된 데이터 반영 & rollback 시 undo 영역 데이터로 복구
+    = undo 영역의 백업 데이터를 InnoDB 버퍼풀로 복구
+    = undo 영역 데이터 삭제는 해당 데이터를 필요로하는 트랜잭션이 모두 사라질 때 비로소
+
+
+  
