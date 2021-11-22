@@ -53,4 +53,6 @@ Server - 제공자
   = 내부에 Component 가지는 것, 항상 Component를 호출해야하는 것
   (중복되는 부분을 추상클래스로 만드는 방법도 있다고 한다.)
 
+# 인터페이스/상속 기반으로 프록시 객체 생성
+  단점: 모든 것을 일일이 다 만들어줘야 한다. (중복 & if there are 1000000 classes, then ... would you make as many classes as proxies?)
 
