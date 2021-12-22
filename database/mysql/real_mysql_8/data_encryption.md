@@ -59,8 +59,8 @@ FLUSH TABLES source_table FOR EXPORT;
 
 --- so far 테이블 스페이스 복사 without data encryption ---
 
-additionally,
-5. 임시로 사용할 마스터 키 발급 in source_table.cfp
+additionally, </break>
+5. 임시로 사용할 마스터 키 발급 in source_table.cfp </break>
 6. 암호화 된 테이블의 테이블 스페이스 키를 기존 마스터 키로 복호화
     & 위에서 발급한 임시키로 다시 암호화 후 데이터 파일의 헤더 부분에 저장
 
