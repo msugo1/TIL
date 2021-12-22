@@ -57,6 +57,6 @@
 - 컨트롤러의 반환 값 변환
     ex. ModelAndView, @ResponseBody, HttpEntity...
 
-!()[./http/http_message_converter.png]
+![](./http/http_message_converter.png)
 
 
