@@ -1,19 +1,9 @@
-# System Account vs Regular Account
-1. System Account
-- DB 서버 관리자를 위한 계정
-- 시스템 계정과 일반 계정관리 가능 & 그 외 중요작업(계정 생성, 삭제, 권한부여 등 && 실행중인 쿼리 강제종료 ... )
-
-2. Regular Account
-- for developers or programs
-- 시스템 계정 관리 불가
-
-
-# create accounts
+## create accounts
 from 8.0
-    create user: 계정 생성
-    grant: 권한 부여 (분리)
+- create user: 계정 생성
+-  grant: 권한 부여 (분리)
 
-* 계정 생성 시 부여가능한 옵션
+### 계정 생성 시 부여가능한 옵션
 - 계정의 인증방식/비밀번호
 - 비밀번호 관련 옵션(유효기간, 이력 개수, 재사용 불가기간)
 - 기본 역할
@@ -135,42 +125,3 @@ in 8.0, 여기에 동적권한 추가
 * 동적권한: 서버가 시작되면서 동적으로 생성하는 권한 (ex. 컴포넌트 or 플러그인 설치 시 등록되는 권한)
     = SUPER 권한이 잘게 쪼개어져, 동적권한으로 분산 
     p. 67 참조
-
-
-# 역할
-- 8.0부터 권한을 묶어서 역할을 사용가능
-- 내부적으로 사용자 계정과 동일한 객체로 취급
-    = 하나의 계정에 다른 계정의 권한을 `병합`하기만 하면되므로, MySQL 서버는 역할과 계정을 구분할 필요가 없다.
-    = CREATE ROLE로 역할 생성 시, 뒤에 호스트를 명시하지 않으면 자동으로 `%`
-
-ex.
-```
-# ROLE 생성하기
-CREATE ROLE
-    role_emp_read,
-    role_emp_write;
-
-# ROLE에 권한 부여하기 (권한이 부여되지 않은 ROLE은 껍데기)
-GRANT SELECT ON employees.* TO role_emp_read;
-GRANT INSERT, UPDATE, DELETE ON employees.* TO role_emp_write;
-
-# 유저 생성하기
-CREATE USER reader@'127.0.0.1' IDENTIFIED BY 'qwerty';
-CREATE USER writer@'127.0.0.1' IDENTIFIED BY 'qwerty';
-
-# 유저에 ROLE 부여하기
-GRANT role_emp_read TO reader@'127.0.0.1';
-GRANT role_emp_read, role_emp_write TO writer@'127.0.0.1';
-
-# 확인하기
-SHOW GRANTS;
-SELECT current_role();
-
-# 권한 활성화
-SET ROLE 'role_emp_read';
-    = 재 로그인 시 권한 초기화
-    = `activate_all_roles_on_login=ON;` # 권한을 자동으로 활성화한다.
-```
-
-
-
