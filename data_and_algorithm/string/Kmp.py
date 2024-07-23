@@ -38,23 +38,3 @@ def kmp(text, pattern):
             i += 1
 
     return matching_start_indice
-
-test_cases = [
-    # ("hello", "ll", 2),
-    # ("hello", "world", -1),
-    ("ababcabcababc", "abc", 2),
-    # ("abc", "abc", 0),
-    # ("", "abc", -1)
-]
-
-for given_string, searching_word, expected in test_cases:
-    result = kmp(given_string, searching_word)
-    print(result)
-    # print(f"given_string: '{given_string}', searching_word: '{searching_word}', expected: {expected}, got: {result}, pass: {result == expected}")
-
-"""
-ababcabcababc
-
- abc
-
-"""
