@@ -10,30 +10,31 @@ class TrieNode:
         self.is_terminal = False  # TODO: requirement?
 
 
-class Trie:
+class AhoCorasickTrie:
 
-    def __init__(self):
+    def __init__(self, patterns):
         self.root = TrieNode()
 
-    def insert(self, word):
-        node = self.root
-        for c in word:
-            child = node.children.get(c)
-            if not child:
-                child = TrieNode()
-                node.children[c] = child
+        # build trie
+        for pattern in patterns:
+            node = self.root
+            for c in pattern:
+                child = node.children.get(c)
+                if not child:
+                    child = TrieNode()
+                    node.children[c] = child
 
-            node = child
+                node = child
 
-        node.output.append(word)
-        node.is_terminal = True
+            node.output.append(pattern)
+            node.is_terminal = True
 
-    def construct_failure_link(self):
+        # build links
         queue = deque()
         queue.append(self.root)
 
-        # p: 현재 위치, q: 가리키는 노드
         while queue:
+            # p: 현재 위치, q: 가리키는 노드
             p = queue.popleft()
             for c, q in p.children.items():
                 queue.append(q)
@@ -52,12 +53,25 @@ class Trie:
                     q.failure_link = self.root
                 else:
                     q.failure_link = link_node.children[c]
+                    q.output += q.failure_link.output  # 출력링크 연결
+
+    def search(self, text: str):
+        matching_patterns = set()
+
+        node = self.root
+        for c in text:
+            while node != self.root and c not in node.children:
+                node = node.failure_link
+
+            if c in node.children:
+                node = node.children[c]
+
+            if node.is_terminal:
+                matching_patterns.update(node.output)
+
+        return matching_patterns
 
 
-trie = Trie()
-trie.insert("ab")
-trie.insert("c")
-trie.insert("a")
-trie.insert("acd")
+trie = AhoCorasickTrie(patterns=["he", "she", "his", "hers"])
+print(trie.search("ushers"))
 
-trie.construct_failure_link()

@@ -85,7 +85,14 @@ KMP 알고리즘에서 정의하는 접두사, 접미사?
 - 아호 코라식 알고리즘을 이용하면 O(m + p + n)의 시간복잡도로 다양한 패턴집합에 대한 탐색도 선형시간에 해결이 가능하다. 이때, trie를 활용한다.
   - 패턴 문자열의 개수와 상관없이 원본 문자열을 한 번만 훑어서 매칭된 문자열을 찾아낸다.
 
-### 실패함수
+### Failure Link
+
+**설명** <br>
+- KMP와 달리 검색어가 여러개이므로 걸칠 수 있는 대상은 하나가 아니라 여러 개가 될 수 있다.
+- ~AB 까지 일치여부를 확인하고 실패했다면, AB로 시작하는 다른 지점으로 이동해서 그 다음부터 다시 일치/실패여부를 확인해 나간다.
+- = 이전까지 일치한 부분 문자열의 접미사를 접두사로 가지는 다른 검색어로의 링크를 만들어 주는 것
+
+**구현** <br>
 다음 글자가 대응하는데 실패했을 때 다음으로 가서 시도해야 할 노드의 포인터 할당
 
 1. Trie 루트로부터 BFS 를 수행하면서 Failure Link 만들기
@@ -95,10 +102,27 @@ KMP 알고리즘에서 정의하는 접두사, 접미사?
       1. 있다면 f(q) = r
       2. 없다면 p 에 f(p)를 대입한 뒤 i 부터 과정을 반복한다.
 
-### 출력 문자열 목록
-- 각 노드에 도달했을 때 어떤 pattern들을 발견하게 되는가?
-- 한 pattern이 다른 pattern의 부분집합인 경우, 해당 pattern이 종료되는 노드 외의 장소에서도 문자열을 발견할 수 있으므로 별도의 목록이 필요하다.
-    - ex. patterns = [ABC, B, BC] 이면 AB에 도달했을 때 B를, ABC에 도달했을 때 BC를 발견하는 등 ...
+
+
+### Success Link (= output link)
+
+**설명** <br>
+- 현재 문자가 비교 중인 텍스트 원소와 일치한다면 이동할 노드 링크
+  - 패턴들 중 다른 패턴의 substring인 string이 존재하게 되면 text에 등장하는 모든 패턴들을 탐색하지 못할 수 있다.
+  - 이를 막기 위해 success link를 둔다.
+- 처음에 각각의 패턴 string 들이 끝나는 정점은 그 정점을 success link로 가지게 된다.
+
+**구현**
+1. Failure Link 를 따라가서 패턴이 끝이 나게 되면 여러 단계의 Failure Link를 무시하고 바로 그 정점으로 Success Link 연결
+2. 그렇지 않으면 그 정점의 Success Link 가져오기
+
+### 탐색
+
+**구현**
+1. text 내 문자와 trie 에서 나가는 간선의 글자와 비교하면서 일치하면 해당 정점으로 이동한다.
+2. success link가 존재하면 매칭 패턴이 존재한다는 의미이므로 결과에 추가한다.
+3. trie 내 일치하는 문자가 없는 경우 일치하는 문자를 찾거나 root 에 도달할 때까지 failure_link 를 찾아간다.
+4. 문자열을 모두 탐색할 때까지 1~3을 반복한다.
 
 ## References
 ### KMP Algorithm
@@ -106,3 +130,4 @@ KMP 알고리즘에서 정의하는 접두사, 접미사?
 
 ### Aho-Corasick Algorithm
 - https://www.slideshare.net/slideshow/ahocorasick-algorithm/53152784
+- https://ansohxxn.github.io/algorithm/ahocorasick/#3%EF%B8%8F%E2%83%A3-%EA%B2%80%EC%83%89-%ED%95%A8%EC%88%98-kmp-%EC%95%8C%EA%B3%A0%EB%A6%AC%EC%A6%98-%EB%B0%A9%EC%8B%9D%EC%9C%BC%EB%A1%9C-%ED%8A%B8%EB%9D%BC%EC%9D%B4%EC%97%90%EC%84%9C-%EA%B2%80%EC%83%89
